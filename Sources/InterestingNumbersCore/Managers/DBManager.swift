@@ -6,12 +6,14 @@ final class DBManager: QueryHandler, Preserver {
     private let queue = DispatchQueue(label: "dbQueue", qos: .background, attributes: .concurrent)
 
     func request(query: Query) -> AnyPublisher<Numbers, Error> {
-        let realm = try? Realm()
-        switch query {
-        case .userValue(let number): return retrieveSingleNumber(using: realm, byKey: number)
-        case .random: return retrieveSingleNumber(using: realm)
-        case .range(let range): return retrieveFrom(Set(range), using: realm)
-        case .multiple(let multiple): return retrieveFrom(Set(multiple), using: realm)
+        queue.sync {
+            let realm = try? Realm()
+            switch query {
+            case .userValue(let number): return retrieveSingleNumber(using: realm, byKey: number)
+            case .random: return retrieveSingleNumber(using: realm)
+            case .range(let range): return retrieveFrom(Set(range), using: realm)
+            case .multiple(let multiple): return retrieveFrom(Set(multiple), using: realm)
+            }
         }
     }
 
@@ -34,10 +36,17 @@ final class DBManager: QueryHandler, Preserver {
     }
 
     func preserve(numbers: [String: String]) {
-        queue.async {
+        queue.sync {
             let realm = try? Realm()
             let objects = numbers.map { key, value in NumberObject(value: ["number": Int(key) ?? 0, "text": value]) }
             try? realm?.write { realm?.add(objects, update: .modified) }
+        }
+    }
+
+    func clearStorage() {
+        queue.sync {
+            let realm = try? Realm()
+            try? realm?.write { realm?.deleteAll() }
         }
     }
 }
