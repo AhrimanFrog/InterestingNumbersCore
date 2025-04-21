@@ -12,8 +12,6 @@ struct DBManagerTests {
 
         dbManager.preserve(numbers: numbers)
 
-        try await Task.sleep(nanoseconds: 3_000_000)
-
         for try await value in dbManager.request(query: .userValue(7)).values {
             #expect(value == numbers)
         }
@@ -40,8 +38,6 @@ struct DBManagerTests {
 
         let numbers = ["1": "One", "2": "Two", "3": "Three"]
         dbManager.preserve(numbers: numbers)
-
-        try await Task.sleep(nanoseconds: 300_000_000)
         
         for try await value in dbManager.request(query: .range(1...3)).values {
             #expect(value == numbers)

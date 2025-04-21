@@ -7,8 +7,6 @@ public final class InterestingNumbers: DataProvider {
     private let networkMonitor = NWPathMonitor()
     private let monitoringQueue = DispatchQueue(label: "NetworkQueue")
 
-    private var preservationSubscription: AnyCancellable?
-
     public let isConnected = CurrentValueSubject<Bool, Never>(true)
 
     public init(networkProvider: QueryHandler, dbProvider: QueryHandler & Preserver) {
@@ -25,20 +23,11 @@ public final class InterestingNumbers: DataProvider {
         return dbProvider.request(query: query)
             .catch { [weak self] error -> AnyPublisher<Numbers, Error> in
                 guard let self else { return Fail(error: error).eraseToAnyPublisher() }
-                return getDataFromInternet(query)
+                return networkProvider.request(query: query)
+                    .handleEvents(receiveOutput: { [weak self] in self?.dbProvider.preserve(numbers: $0) })
+                    .eraseToAnyPublisher()
             }
             .eraseToAnyPublisher()
-    }
-
-    private func getDataFromInternet(_ query: Query) -> AnyPublisher<Numbers, Error> {
-        let pub = networkProvider.request(query: query)
-        preservationSubscription = pub.sink { [weak self] result in
-            switch result {
-            case .success(let numbers): self?.dbProvider.preserve(numbers: numbers)
-            case .failure: break
-            }
-        }
-        return pub
     }
 
     private func startMonitoringConnection() {
